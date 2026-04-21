@@ -8,7 +8,7 @@
 
 	<Identity
 		Name="sonic3air.uwp"
-		Publisher="CN=Developer"
+		Publisher="CN=Caorthann"
 		Version="1.0.0.0" />
 
 	<mp:PhoneIdentity
