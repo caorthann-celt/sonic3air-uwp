@@ -143,7 +143,11 @@ namespace rmx
 			}
 		#endif
 		#ifdef RMX_USE_GLAD
-			gladLoadGL();
+			if (0 == gladLoadGL((GLADloadfunc)SDL_GL_GetProcAddress))
+			{
+				RMX_ERROR("Error in OpenGL initialization (gladLoadGL)", );
+				return false;
+			}
 		#endif
 		}
 	#endif

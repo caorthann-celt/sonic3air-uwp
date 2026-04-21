@@ -19,6 +19,7 @@
 
 namespace
 {
+	const char* UWP_NONE_GAMEPAD_MARKER = "__UWP_NONE__";
 
 	const char* getJoystickName(SDL_Joystick* joystick)
 	{
@@ -105,6 +106,56 @@ namespace
 		return false;
 	}
 
+#if defined(PLATFORM_UWP)
+	void applyUwpXboxDefaultMapping(InputConfig::ControlMapping* mappings)
+	{
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::UP].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 10),
+			InputConfig::Assignment(InputConfig::Assignment::Type::AXIS, 1)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::DOWN].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 12),
+			InputConfig::Assignment(InputConfig::Assignment::Type::AXIS, 0)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::LEFT].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 13),
+			InputConfig::Assignment(InputConfig::Assignment::Type::AXIS, 2)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::RIGHT].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 11),
+			InputConfig::Assignment(InputConfig::Assignment::Type::AXIS, 3)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::A].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 0)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::B].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 1)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::X].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 2)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::Y].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 3)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::START].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 7)
+		};
+		mappings[(size_t)InputConfig::DeviceDefinition::Button::BACK].mAssignments =
+		{
+			InputConfig::Assignment(InputConfig::Assignment::Type::BUTTON, 6)
+		};
+	}
+#endif
+
 	void setupRealDeviceInputMapping(InputManager::RealDevice& device, const InputConfig::DeviceDefinition& inputDeviceDefinition)
 	{
 		device.mControlMappings.resize(InputConfig::DeviceDefinition::NUM_BUTTONS);
@@ -151,6 +202,11 @@ namespace
 				}
 			}
 		}
+
+#if defined(PLATFORM_UWP)
+		// Give new UWP pads the Xbox defaults once, then leave saved edits alone.
+		applyUwpXboxDefaultMapping(device.mControlMappings.data());
+#endif
 	}
 
 	void processGamepadInputMapping(InputConfig::DeviceDefinition& inputDeviceDefinition, SDL_GameController& gameController)
@@ -172,6 +228,8 @@ namespace
 	{
 		String joystickName = getJoystickName(device.mSDLJoystick);
 		String controllerName = getGameControllerName(device.mSDLGameController);
+		const String originalJoystickName = joystickName;
+		const String originalControllerName = controllerName;
 		if (controllerName.nonEmpty() && controllerName != joystickName)
 		{
 			if (index >= 0)
@@ -185,7 +243,13 @@ namespace
 			controllerName.clear();
 		}
 		joystickName.lowerCase();
-		const uint64 nameHashes[2] = { rmx::getMurmur2_64(joystickName), controllerName.empty() ? 0 : rmx::getMurmur2_64(controllerName) };
+		const uint64 nameHashes[4] =
+		{
+			rmx::getMurmur2_64(joystickName),
+			controllerName.empty() ? 0 : rmx::getMurmur2_64(controllerName),
+			rmx::getMurmur2_64(originalJoystickName),
+			originalControllerName.empty() ? 0 : rmx::getMurmur2_64(originalControllerName)
+		};
 		constexpr uint64 WILDCARD_HASH = rmx::constMurmur2_64("*");
 
 		for (size_t k = 0; k < definitions.size(); ++k)
@@ -196,7 +260,10 @@ namespace
 				for (const auto& pair : inputDeviceDefinition.mDeviceNames)
 				{
 					const uint64 deviceNameHash = pair.first;
-					if (deviceNameHash == nameHashes[0] || (nameHashes[1] != 0 && deviceNameHash == nameHashes[1]))
+					if (deviceNameHash == nameHashes[0] ||
+						(nameHashes[1] != 0 && deviceNameHash == nameHashes[1]) ||
+						deviceNameHash == nameHashes[2] ||
+						(nameHashes[3] != 0 && deviceNameHash == nameHashes[3]))
 					{
 						outMatchingDefinition = &inputDeviceDefinition;
 						return;
@@ -302,7 +369,18 @@ InputManager::InputManager()
 void InputManager::startup()
 {
 	// Initialize gamepad
-	SDL_InitSubSystem(SDL_INIT_JOYSTICK);
+#if defined(PLATFORM_UWP)
+	const uint32 initFlags = SDL_INIT_JOYSTICK | SDL_INIT_GAMECONTROLLER;
+#else
+	const uint32 initFlags = SDL_INIT_JOYSTICK;
+#endif
+
+	(void)SDL_InitSubSystem(initFlags);
+#if defined(PLATFORM_UWP)
+	SDL_JoystickEventState(SDL_ENABLE);
+	SDL_GameControllerEventState(SDL_ENABLE);
+#endif
+
 	rescanRealDevices();
 }
 
@@ -591,6 +669,10 @@ InputManager::RescanResult InputManager::rescanRealDevices()
 
 		// Is this gamepad already in our list?
 		SDL_Joystick* joystick = SDL_JoystickOpen(i);
+		if (nullptr == joystick)
+		{
+			continue;
+		}
 		const int32 joystickInstanceId = SDL_JoystickInstanceID(joystick);
 		{
 			RealDevice* existingGamepad = findGamepadBySDLJoystickInstanceId(joystickInstanceId);
@@ -610,6 +692,15 @@ InputManager::RescanResult InputManager::rescanRealDevices()
 		// Skip it if it's blacklisted
 		if (isBlacklistedName(joystickName) || isBlacklistedName(controllerName))
 			continue;
+
+#if defined(PLATFORM_UWP)
+		// Skip the annoying phantom controller UWP sometimes reports.
+		if (nullptr == controller)
+		{
+			SDL_JoystickClose(joystick);
+			continue;
+		}
+#endif
 
 		RealDevice& device = vectorAdd(mGamepads);
 		device.mType = InputConfig::DeviceType::GAMEPAD;
@@ -644,6 +735,15 @@ InputManager::RescanResult InputManager::rescanRealDevices()
 		}
 		else
 		{
+			if (nullptr != controller)
+			{
+				SDL_GameControllerClose(controller);
+			}
+			if (nullptr != joystick)
+			{
+				SDL_JoystickClose(joystick);
+			}
+			mGamepads.pop_back();
 			continue;
 		}
 
@@ -698,9 +798,17 @@ InputManager::RescanResult InputManager::rescanRealDevices()
 			inputDeviceDefinition.mDeviceType = InputConfig::DeviceType::GAMEPAD;
 
 			inputDeviceDefinition.mDeviceNames[rmx::getMurmur2_64(joystickName)] = joystickName;
+			{
+				String lowercaseJoystickName = joystickName;
+				lowercaseJoystickName.lowerCase();
+				inputDeviceDefinition.mDeviceNames[rmx::getMurmur2_64(lowercaseJoystickName)] = joystickName;
+			}
 			if (!controllerName.empty() && controllerName != joystickName)
 			{
 				inputDeviceDefinition.mDeviceNames[rmx::getMurmur2_64(controllerName)] = controllerName;
+				String lowercaseControllerName = controllerName;
+				lowercaseControllerName.lowerCase();
+				inputDeviceDefinition.mDeviceNames[rmx::getMurmur2_64(lowercaseControllerName)] = controllerName;
 			}
 
 			for (size_t controlIndex = 0; controlIndex < device.mControlMappings.size(); ++controlIndex)
@@ -739,7 +847,6 @@ InputManager::RescanResult InputManager::rescanRealDevices()
 	result.mGamepadsFound = (uint32)mGamepads.size();
 	return result;
 }
-
 void InputManager::updatePlayerGamepadAssignments()
 {
 	// Try to map real devices to players
@@ -751,9 +858,54 @@ void InputManager::updatePlayerGamepadAssignments()
 		mKeyboards[i].mAssignedPlayer = (int)i;
 	}
 
+#if defined(PLATFORM_UWP)
 	for (RealDevice& gamepad : mGamepads)
 	{
-		gamepad.mAssignedPlayer = Configuration::instance().mAutoAssignGamepadPlayerIndex;
+		gamepad.mAssignedPlayer = -1;
+	}
+
+	// Keep any player 1 or player 2 choice the user already made.
+	for (int playerIndex = 0; playerIndex < NUM_PLAYERS; ++playerIndex)
+	{
+		RealDevice* gamepad = findGamepadBySDLJoystickInstanceId(mPlayers[playerIndex].mPreferredGamepad.mSDLJoystickInstanceId);
+		if (nullptr != gamepad && gamepad->mAssignedPlayer < 0)
+		{
+			gamepad->mAssignedPlayer = playerIndex;
+		}
+	}
+
+	// Then give the next free pad to player 2.
+	for (int playerIndex = 0; playerIndex < NUM_PLAYERS; ++playerIndex)
+	{
+		if (playerIndex > 0 && Configuration::instance().mPreferredGamepad[playerIndex] == UWP_NONE_GAMEPAD_MARKER)
+			continue;
+
+		bool alreadyHasGamepad = false;
+		for (const RealDevice& otherGamepad : mGamepads)
+		{
+			if (otherGamepad.mAssignedPlayer == playerIndex)
+			{
+				alreadyHasGamepad = true;
+				break;
+			}
+		}
+		if (alreadyHasGamepad)
+			continue;
+
+		for (RealDevice& gamepad : mGamepads)
+		{
+			if (gamepad.mAssignedPlayer < 0)
+			{
+				gamepad.mAssignedPlayer = playerIndex;
+				break;
+			}
+		}
+	}
+#else
+	const int autoAssignPlayerIndex = Configuration::instance().mAutoAssignGamepadPlayerIndex;
+	for (RealDevice& gamepad : mGamepads)
+	{
+		gamepad.mAssignedPlayer = autoAssignPlayerIndex;
 	}
 	for (int playerIndex = NUM_PLAYERS - 1; playerIndex >= 0; --playerIndex)	// Reverse order to make sure player 1 overwrites player 2
 	{
@@ -763,6 +915,8 @@ void InputManager::updatePlayerGamepadAssignments()
 			gamepad->mAssignedPlayer = playerIndex;
 		}
 	}
+#endif
+
 	for (RealDevice& gamepad : mGamepads)
 	{
 		if (gamepad.mAssignedPlayer >= 0)
@@ -818,6 +972,12 @@ void InputManager::setPreferredGamepad(int playerIndex, const RealDevice* gamepa
 {
 	RMX_ASSERT(playerIndex >= 0 && playerIndex < NUM_PLAYERS, "Invalid player index " << playerIndex);
 	PreferredGamepad& preferredGamepad = mPlayers[playerIndex].mPreferredGamepad;
+#if defined(PLATFORM_UWP)
+	if (playerIndex == 0 && nullptr == gamepad && !mGamepads.empty())
+	{
+		gamepad = &mGamepads[0];
+	}
+#endif
 	if (nullptr != gamepad)
 	{
 		preferredGamepad.mSDLJoystickInstanceId = gamepad->mSDLJoystickInstanceId;
@@ -826,6 +986,13 @@ void InputManager::setPreferredGamepad(int playerIndex, const RealDevice* gamepa
 	else
 	{
 		preferredGamepad.mSDLJoystickInstanceId = -1;
+#if defined(PLATFORM_UWP)
+		if (playerIndex > 0)
+		{
+			Configuration::instance().mPreferredGamepad[playerIndex] = UWP_NONE_GAMEPAD_MARKER;
+		}
+		else
+#endif
 		Configuration::instance().mPreferredGamepad[playerIndex].clear();
 	}
 	updatePlayerGamepadAssignments();

@@ -21,8 +21,12 @@
 
 
 // Platform specific
-#if defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
+#if defined(WINAPI_FAMILY) && (WINAPI_FAMILY == WINAPI_FAMILY_APP)
+	#define PLATFORM_UWP
+
+#elif defined(WIN32) || defined(_WIN32) || defined(__WIN32__) || defined(__NT__)
 	#define PLATFORM_WINDOWS
+	#define PLATFORM_WINDOWS_DESKTOP
 	#if defined(__GNUC__)
 		#define USE_UTF8_PATHS
 	#endif

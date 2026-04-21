@@ -82,6 +82,16 @@ mac_dist
 # Android
 /Oxygen/sonic3air/build/_android/local.properties
 
+# UWP port build trees
+/ports/uwp/build/
+/ports/uwp/build-*/
+/ports/uwp/AppPackages/
+/ports/uwp/**/*.vcxproj.user
+!/ports/uwp/third_party/uwp-deps/x64/bin/
+!/ports/uwp/third_party/uwp-deps/x64/bin/*.dll
+!/ports/uwp/third_party/uwp-deps/x64/lib/
+!/ports/uwp/third_party/uwp-deps/x64/lib/*.lib
+
 # Discord Game SDL binaries
 !/Oxygen/sonic3air/source/external/discord_game_sdk/lib/*/*.dll
 !/Oxygen/sonic3air/source/external/discord_game_sdk/lib/*/*.lib

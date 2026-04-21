@@ -9,7 +9,16 @@
 #include "oxygen/pch.h"
 #include "oxygen/download/Downloader.h"
 
-#if defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_UWP)
+	#define PLATFORM_SUPPORTS_DOWNLOADER
+	#define WIN32_LEAN_AND_MEAN
+	#include "CleanWindowsInclude.h"
+	#include <winrt/base.h>
+	#include <winrt/Windows.Foundation.h>
+	#include <winrt/Windows.Storage.Streams.h>
+	#include <winrt/Windows.Web.Http.h>
+
+#elif defined(PLATFORM_WINDOWS)
 	#define PLATFORM_SUPPORTS_DOWNLOADER
 	#define USING_CURL
 
@@ -122,7 +131,82 @@ size_t Downloader::writeData(void* data, size_t size, size_t nmemb)
 
 void Downloader::performDownload()
 {
-#if defined(USING_CURL)
+#if defined(PLATFORM_UWP)
+
+	try
+	{
+		winrt::init_apartment();
+
+		using namespace winrt::Windows::Foundation;
+		using namespace winrt::Windows::Storage::Streams;
+		using namespace winrt::Windows::Web::Http;
+
+		HttpClient httpClient;
+		const Uri requestUri(rmx::convertFromUTF8(mURL));
+		HttpResponseMessage response = httpClient.GetAsync(requestUri, HttpCompletionOption::ResponseHeadersRead).get();
+		response.EnsureSuccessStatusCode();
+
+		IInputStream inputStream = response.Content().ReadAsInputStreamAsync().get();
+		mOutputFile.open(Configuration::instance().mAppDataPath + mOutputFilename, FILE_ACCESS_WRITE);
+		if (!mOutputFile.isOpen())
+		{
+			mState = State::FAILED;
+			return;
+		}
+
+		mThreadRunning = true;
+		mBytesDownloaded = 0;
+
+		Buffer buffer(64 * 1024);
+		while (mThreadRunning)
+		{
+			const IBuffer readBuffer = inputStream.ReadAsync(buffer, buffer.Capacity(), InputStreamOptions::None).get();
+			if (readBuffer.Length() == 0)
+				break;
+
+			DataReader dataReader = DataReader::FromBuffer(readBuffer);
+			std::vector<uint8> bytes(readBuffer.Length());
+			dataReader.ReadBytes(bytes);
+
+			const size_t written = mOutputFile.write(bytes.data(), bytes.size());
+			mBytesDownloaded += written;
+			if (written != bytes.size())
+			{
+				mThreadRunning = false;
+				mState = State::FAILED;
+				break;
+			}
+		}
+
+		mOutputFile.close();
+		inputStream.Close();
+
+		if (mState != State::FAILED)
+		{
+			mState = mThreadRunning ? State::DONE : State::FAILED;
+		}
+		mThreadRunning = false;
+	}
+	catch (const std::exception&)
+	{
+		mOutputFile.close();
+		mThreadRunning = false;
+		mState = State::FAILED;
+	}
+	catch (const winrt::hresult_error&)
+	{
+		mOutputFile.close();
+		mThreadRunning = false;
+		mState = State::FAILED;
+	}
+	catch (...)
+	{
+		mOutputFile.close();
+		mThreadRunning = false;
+		mState = State::FAILED;
+	}
+
+#elif defined(USING_CURL)
 
 	CURL* curl = curl_easy_init();
 	if (nullptr == curl)

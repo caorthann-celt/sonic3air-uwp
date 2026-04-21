@@ -74,6 +74,7 @@ void OptionsConfig::buildSystem()
 	ConfigBuilder configBuilder(mSystemOptions);
 
 #if !defined(PLATFORM_VITA)
+#if !defined(PLATFORM_UWP)
 	CATEGORY("Update")
 	{
 		configBuilder.addSetting("Check for updates", option::_CHECK_FOR_UPDATE)
@@ -81,6 +82,7 @@ void OptionsConfig::buildSystem()
 			.addOption("Stable & preview", 1)
 			.addOption("All incl. test builds", 2);
 	}
+#endif
 
 	CATEGORY("Ghost Sync")
 	{
@@ -96,17 +98,21 @@ void OptionsConfig::buildSystem()
 #endif
 
 #if defined(SUPPORT_IMGUI)
+#if !defined(PLATFORM_UWP)
 	CATEGORY("Data Management")
 	{
 		configBuilder.addSetting("Open File Browser", option::_OPEN_FILE_BROWSER);
 	}
 #endif
+#endif
 
+#if !defined(PLATFORM_UWP)
 	CATEGORY("More Info")
 	{
 		configBuilder.addSetting("Open Game Homepage", option::_OPEN_HOMEPAGE);
 		configBuilder.addSetting("Open Manual", option::_OPEN_MANUAL);
 	}
+#endif
 
 	CATEGORY("Debugging")
 	{
@@ -122,12 +128,14 @@ void OptionsConfig::buildSystem()
 			.addOption("Enabled", 1);
 	}
 
+#if !defined(PLATFORM_UWP)
 	CATEGORY("Dev Mode")
 	{
 		configBuilder.addSetting("Dev Mode", option::DEV_MODE)
 			.addOption("Off", 0)
 			.addOption("On", 1);
 	}
+#endif
 }
 
 void OptionsConfig::buildDisplay()
@@ -140,11 +148,15 @@ void OptionsConfig::buildDisplay()
 		const Configuration::RenderMethod highest = Configuration::getHighestSupportedRenderMethod();
 
 	#if !defined(PLATFORM_VITA)
+	#if defined(PLATFORM_UWP)
+		configBuilder.addOption("OpenGL Hardware", (uint32)Configuration::RenderMethod::OPENGL_FULL);
+	#else
 		configBuilder.addOption("Fail-Safe / Software", (uint32)Configuration::RenderMethod::SOFTWARE);
 		if (highest >= Configuration::RenderMethod::OPENGL_SOFT)
 			configBuilder.addOption("OpenGL Software", (uint32)Configuration::RenderMethod::OPENGL_SOFT);
 		if (highest >= Configuration::RenderMethod::OPENGL_FULL)
 			configBuilder.addOption("OpenGL Hardware", (uint32)Configuration::RenderMethod::OPENGL_FULL);
+	#endif
 	#else
 		// OpenGL Hardware does not work correctly on PSVita
 		configBuilder.addOption("OpenGL Software", (uint32)Configuration::RenderMethod::OPENGL_SOFT);
@@ -203,6 +215,13 @@ void OptionsConfig::buildDisplay()
 	CATEGORY("Window Mode")
 	{
 	#if !defined(PLATFORM_VITA)
+	#if defined(PLATFORM_UWP)
+		configBuilder.addSetting("Current Screen:", option::WINDOW_MODE)
+			.addOption("Fullscreen", (uint32)Configuration::WindowMode::FULLSCREEN_DESKTOP);
+
+		configBuilder.addSetting("Startup Screen:", option::WINDOW_MODE_STARTUP)
+			.addOption("Fullscreen", (uint32)Configuration::WindowMode::FULLSCREEN_DESKTOP);
+	#else
 	#if defined(PLATFORM_LINUX)
 		// Under Linux, the fullscreen with desktop resolution works better, so that's what we present as option
 		const Configuration::WindowMode borderlessFullscreenMode = Configuration::WindowMode::FULLSCREEN_DESKTOP;
@@ -219,6 +238,7 @@ void OptionsConfig::buildDisplay()
 			.addOption("Windowed", (uint32)Configuration::WindowMode::WINDOWED)
 			.addOption("Fullscreen", (uint32)borderlessFullscreenMode)
 			.addOption("Exclusive Fullscreen", (uint32)Configuration::WindowMode::FULLSCREEN_EXCLUSIVE);
+	#endif
 	#else
 		// These aren't supposed to show up on the Vita
 		configBuilder.addSetting("Current Screen:", option::WINDOW_MODE)
@@ -514,8 +534,13 @@ void OptionsConfig::buildControls()
 			configBuilder.addSetting(*String(0, "Controller Player %d", k+1), (option::Option)(option::CONTROLLER_PLAYER_1 + k));
 			if (Application::instance().hasVirtualGamepad())
 				configBuilder.addOption("None (Touch only)", -1);
+#if defined(PLATFORM_UWP)
+			else
+				configBuilder.addOption("None", -1);
+#else
 			else
 				configBuilder.addOption("None (Keyboard only)", -1);
+#endif
 			// Actual options will get filled in inside "OptionsMenu::refreshGamepadLists"
 		}
 

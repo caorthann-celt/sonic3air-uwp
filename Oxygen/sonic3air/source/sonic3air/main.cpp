@@ -44,7 +44,7 @@ extern "C"
 #endif
 
 
-int main(int argc, char** argv)
+extern "C" int sonic3air_main(int argc, char** argv)
 {
 	EngineMain::earlySetup();
 	PlatformSpecifics::platformStartup();
@@ -116,4 +116,9 @@ int main(int argc, char** argv)
 	}
 
 	return 0;
+}
+
+int main(int argc, char** argv)
+{
+	return sonic3air_main(argc, argv);
 }

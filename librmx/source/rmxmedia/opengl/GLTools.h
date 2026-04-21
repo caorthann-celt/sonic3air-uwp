@@ -17,10 +17,8 @@
 	inline void glViewport_Recti(Recti rect)				{ glViewport(rect.left, rect.top, rect.width, rect.height); }
 
 	#ifdef ALLOW_LEGACY_OPENGL
-		inline void glRectf(Rectf rect)					{ glRectf(rect.left, rect.top, rect.left + rect.width, rect.top + rect.height); }
 		inline void glTranslatefv(const GLfloat* vec)	{ glTranslatef(vec[0], vec[1], vec[2]); }
 		inline void glTranslatefv(const Vec3f& vec)		{ glTranslatef(vec.x, vec.y, vec.z); }
-		inline void glScalef(GLfloat scale)				{ glScalef(scale, scale, scale); }
 		inline void glColor1f(GLfloat gray)				{ glColor3f(gray, gray, gray); }
 		inline void glColorAlpha(GLfloat alpha)			{ glColor4f(1.0f, 1.0f, 1.0f, alpha); }
 		inline void glColor(const Vec3f& color)			{ glColor3fv(*color); }

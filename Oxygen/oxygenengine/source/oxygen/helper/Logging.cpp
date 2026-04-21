@@ -90,7 +90,11 @@ namespace oxygen
 	void Logging::startup(const std::wstring& filename)
 	{
 		rmx::Logging::addLogger(*new rmx::StdCoutLogger());
+#if !defined(PLATFORM_UWP)
 		rmx::Logging::addLogger(*new rmx::FileLogger(filename, true));
+#else
+		(void)filename;
+#endif
 
 		// Register as logger and message box callback for rmx error handling
 		rmx::ErrorHandling::mLogger = &mErrorLogger;

@@ -10,8 +10,13 @@
 #include "sonic3air/audio/RemasteredMusicDownload.h"
 #include "sonic3air/audio/AudioOut.h"
 
+#include "oxygen/application/Configuration.h"
 #include "oxygen/download/DownloadManager.h"
 
+#if defined(PLATFORM_UWP)
+	#define WIN32_LEAN_AND_MEAN
+	#include "CleanWindowsInclude.h"
+#endif
 
 RemasteredMusicDownload::RemasteredMusicDownload() :
 	mDownloadID(rmx::constMurmur2_64("RemasteredSoundtrack"))

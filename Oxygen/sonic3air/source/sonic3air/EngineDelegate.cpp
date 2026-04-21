@@ -64,6 +64,9 @@ bool EngineDelegate::onEnginePreStartup()
 	CrashHandler::setApplicationInfo(std::string("Sonic 3 A.I.R. v") + BUILD_STRING);
 	oxygen::Logging::setAssertBreakCaption(std::string("Sonic 3 A.I.R. - v") + BUILD_STRING);
 
+#if defined(PLATFORM_UWP)
+	return true;
+#else
 	// Sanity check if the game is even extracted
 	{
 		// One of these two files must exist
@@ -85,6 +88,7 @@ bool EngineDelegate::onEnginePreStartup()
 	}
 
 	return true;
+#endif
 }
 
 bool EngineDelegate::isDedicatedApplication()

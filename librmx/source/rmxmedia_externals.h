@@ -27,7 +27,10 @@
 
 
 // SDL
-#ifdef PLATFORM_WINDOWS
+#if defined(PLATFORM_UWP)
+	#include <SDL.h>
+
+#elif defined(PLATFORM_WINDOWS)
 	// Needed for MSYS2
 	#if defined(__GNUC__)
 		#include <SDL2/SDL.h>
@@ -44,7 +47,11 @@
 
 
 // OpenGL
-#if defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_UWP)
+	#define ALLOW_LEGACY_OPENGL
+	#define RMX_USE_GLAD
+
+#elif defined(PLATFORM_WINDOWS)
 	#define ALLOW_LEGACY_OPENGL
 	#define RMX_USE_GLEW
 
@@ -113,4 +120,8 @@
 	#endif
 	#define GLEW_NO_GLU
 	#include "rmxmedia/_glew/GL/glew.h"
+#endif
+
+#ifdef RMX_USE_GLAD
+	#include <glad/gl.h>
 #endif

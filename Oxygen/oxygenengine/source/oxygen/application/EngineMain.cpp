@@ -39,11 +39,9 @@
 	#include "oxygen/platform/android/AndroidJavaInterface.h"
 #endif
 
-
 #if defined(PLATFORM_WINDOWS) || defined(PLATFORM_LINUX)
 	#define LOAD_APP_ICON_PNG
 #endif
-
 
 struct EngineMain::Internal
 {
@@ -171,6 +169,9 @@ uint32 EngineMain::getPlatformFlags() const
 void EngineMain::switchToRenderMethod(Configuration::RenderMethod newRenderMethod)
 {
 	Configuration& config = Configuration::instance();
+#if defined(PLATFORM_UWP)
+	newRenderMethod = Configuration::RenderMethod::OPENGL_FULL;
+#endif
 	const bool wasUsingOpenGL = (config.mRenderMethod == Configuration::RenderMethod::OPENGL_FULL || config.mRenderMethod == Configuration::RenderMethod::OPENGL_SOFT);
 	config.mRenderMethod = newRenderMethod;
 
@@ -378,6 +379,9 @@ void EngineMain::initDirectories()
 	#elif defined(PLATFORM_VITA)
 		// Vita
 		config.mAppDataPath = L"ux0:data/sonic3air/savedata/";
+	#elif defined(PLATFORM_UWP)
+		config.mAppDataPath = PlatformFunctions::getAppDataPath();
+		FTX::FileSystem->normalizePath(config.mAppDataPath, true);
 	#elif !defined(PLATFORM_IOS)
 		// Choose app data path
 		{
@@ -500,10 +504,18 @@ bool EngineMain::initConfigAndSettings()
 	if (config.mRenderMethod > Configuration::getHighestSupportedRenderMethod())
 		config.mRenderMethod = Configuration::getHighestSupportedRenderMethod();
 
+#if defined(PLATFORM_UWP)
+	config.mRenderMethod = Configuration::RenderMethod::OPENGL_FULL;
+	config.mAutoDetectRenderMethod = false;
+#endif
+
 #if defined(PLATFORM_ANDROID) || defined(PLATFORM_IOS) || defined(PLATFORM_VITA)
 	// Use fullscreen, with no borders please
 	//  -> Note that this doesn't work for the web version, if running in mobile browsers - we rely on a window with fixed size (see config.json) there
 	config.mWindowMode = Configuration::WindowMode::FULLSCREEN_EXCLUSIVE;
+#endif
+#if defined(PLATFORM_UWP)
+	config.mWindowMode = Configuration::WindowMode::FULLSCREEN_DESKTOP;
 #endif
 
 	RMX_LOG_INFO(((config.mRenderMethod == Configuration::RenderMethod::SOFTWARE) ? "Using pure software renderer" :
@@ -675,7 +687,12 @@ bool EngineMain::createWindow()
 	// Setup video config
 	rmx::VideoConfig videoConfig(config.mWindowMode != Configuration::WindowMode::WINDOWED, config.mWindowSize.x, config.mWindowSize.y, appMetaData.mTitle.c_str());
 	videoConfig.mRenderer = useOpenGL ? rmx::VideoConfig::Renderer::OPENGL : rmx::VideoConfig::Renderer::SOFTWARE;
-	videoConfig.mResizeable = true;
+	videoConfig.mResizeable =
+#if defined(PLATFORM_UWP)
+		false;
+#else
+		true;
+#endif
 	videoConfig.mAutoClearScreen = useOpenGL;
 	videoConfig.mAutoSwapBuffers = false;
 	videoConfig.mVSync = (config.mFrameSync >= Configuration::FrameSyncType::VSYNC_ON);
@@ -698,6 +715,20 @@ bool EngineMain::createWindow()
 		RMX_LOG_INFO("Setup of OpenGL attributes...");
 	#if !defined(RMX_USE_GLES2)
 		{
+		#if defined(PLATFORM_UWP)
+			const int majorVersion = 3;
+			const int minorVersion = 1;
+
+			SDL_GL_SetAttribute(SDL_GL_RED_SIZE, 8);
+			SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, 8);
+			SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, 8);
+			SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
+
+			RMX_LOG_INFO("Using UWP OpenGL " << majorVersion << "." << minorVersion << " compatibility profile");
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_COMPATIBILITY);
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, majorVersion);
+			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minorVersion);
+		#else
 			// OpenGL 3.1 or 3.2
 			const int majorVersion = 3;
 		#if defined(PLATFORM_MAC)
@@ -716,6 +747,7 @@ bool EngineMain::createWindow()
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_PROFILE_MASK, SDL_GL_CONTEXT_PROFILE_CORE);
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, majorVersion);
 			SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, minorVersion);
+		#endif
 		}
 	#else
 		{
@@ -733,9 +765,20 @@ bool EngineMain::createWindow()
 
 	// Create window
 	{
-		const int displayIndex = config.mDisplayIndex;
-
 		uint32 flags = useOpenGL ? SDL_WINDOW_OPENGL : 0;
+		int windowPosX = SDL_WINDOWPOS_CENTERED;
+		int windowPosY = SDL_WINDOWPOS_CENTERED;
+
+	#if defined(PLATFORM_UWP)
+		const int displayIndex = config.mDisplayIndex;
+		videoConfig.mWindowRect.setSize(getDisplaySize(displayIndex));
+		flags |= SDL_WINDOW_SHOWN;
+		flags |= SDL_WINDOW_FULLSCREEN_DESKTOP;
+	#else
+		const int displayIndex = config.mDisplayIndex;
+		windowPosX = SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex);
+		windowPosY = SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex);
+
 		switch (config.mWindowMode)
 		{
 			case Configuration::WindowMode::WINDOWED:
@@ -771,9 +814,9 @@ bool EngineMain::createWindow()
 				break;
 			}
 		}
+	#endif
 
-		RMX_LOG_INFO("Creating window...");
-		mSDLWindow = SDL_CreateWindow(*videoConfig.mCaption, SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex), SDL_WINDOWPOS_CENTERED_DISPLAY(displayIndex), videoConfig.mWindowRect.width, videoConfig.mWindowRect.height, flags);
+		mSDLWindow = SDL_CreateWindow(*videoConfig.mCaption, windowPosX, windowPosY, videoConfig.mWindowRect.width, videoConfig.mWindowRect.height, flags);
 		if (nullptr == mSDLWindow)
 		{
 			return false;

@@ -13,6 +13,10 @@
 #include "oxygen/application/Application.h"
 #include "oxygen/application/Configuration.h"
 
+#if defined(PLATFORM_UWP)
+	#define WIN32_LEAN_AND_MEAN
+	#include "CleanWindowsInclude.h"
+#endif
 
 AudioOutBase::AudioOutBase() :
 	mAudioPlayer(mAudioCollection)

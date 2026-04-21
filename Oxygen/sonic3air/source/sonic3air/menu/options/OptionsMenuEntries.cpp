@@ -19,12 +19,29 @@
 #include "sonic3air/version.inc"
 
 #include "oxygen/application/Application.h"
+#include "oxygen/application/Configuration.h"
 #include "oxygen/application/modding/Mod.h"
 #include "oxygen/download/Downloader.h"
-
-
 namespace
 {
+	bool hasDownloadedRemasteredSoundtrackPackage()
+	{
+#if defined(PLATFORM_UWP)
+		return FTX::FileSystem->exists(Configuration::instance().mAppDataPath + L"data/audioremaster.bin");
+#else
+		return AudioOut::instance().hasLoadedRemasteredSoundtrack();
+#endif
+	}
+
+	bool hasReadyRemasteredSoundtrackPackage()
+	{
+#if defined(PLATFORM_UWP)
+		return hasDownloadedRemasteredSoundtrackPackage() && AudioOut::instance().hasLoadedRemasteredSoundtrack();
+#else
+		return AudioOut::instance().hasLoadedRemasteredSoundtrack();
+#endif
+	}
+
 	const String& getVersionString(uint32 buildNumber)
 	{
 		static uint32 cachedBuildNumber = 0xffffffff;
@@ -430,7 +447,7 @@ void SoundtrackDownloadMenuEntry::triggerButton()
 
 bool SoundtrackDownloadMenuEntry::shouldBeShown()
 {
-	return (ConfigurationImpl::instance().mActiveSoundtrack == 1 && Downloader::isDownloaderSupported() && !AudioOut::instance().hasLoadedRemasteredSoundtrack());
+	return (ConfigurationImpl::instance().mActiveSoundtrack == 1 && Downloader::isDownloaderSupported() && !hasReadyRemasteredSoundtrackPackage());
 }
 
 

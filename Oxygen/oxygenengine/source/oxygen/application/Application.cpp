@@ -219,11 +219,18 @@ void Application::sdlEvent(const SDL_Event& ev)
 
 		case SDL_JOYDEVICEADDED:
 		{
+#if defined(PLATFORM_UWP)
+			{
+				LogDisplay::instance().setLogDisplay("New game controller found");
+				InputManager::instance().rescanRealDevices();
+			}
+#else
 			if (SDL_GetTicks() > 5000)
 			{
 				LogDisplay::instance().setLogDisplay("New game controller found");
 				InputManager::instance().rescanRealDevices();
 			}
+#endif
 			break;
 		}
 
@@ -295,6 +302,7 @@ void Application::keyboard(const rmx::KeyboardEvent& ev)
 					case 'r':
 					{
 						// Not available for normal users, as this would crash the application if OpenGL is not supported
+#if !defined(PLATFORM_UWP)
 						if (EngineMain::getDelegate().useDeveloperFeatures())
 						{
 							updateWindowDisplayIndex();
@@ -304,6 +312,7 @@ void Application::keyboard(const rmx::KeyboardEvent& ev)
 							LogDisplay::instance().setLogDisplay((Configuration::instance().mRenderMethod == Configuration::RenderMethod::SOFTWARE) ? "Switched to pure software renderer" :
 																 (Configuration::instance().mRenderMethod == Configuration::RenderMethod::OPENGL_SOFT) ? "Switched to opengl-soft renderer" : "Switched to opengl-full renderer");
 						}
+#endif
 						break;
 					}
 
@@ -420,12 +429,14 @@ void Application::keyboard(const rmx::KeyboardEvent& ev)
 					case 'r':
 					{
 						// Only for debugging visual differences between hardware and software renderers
+#if !defined(PLATFORM_UWP)
 						if (Configuration::instance().mRenderMethod != Configuration::RenderMethod::SOFTWARE)
 						{
 							const Configuration::RenderMethod newRenderMethod = (Configuration::instance().mRenderMethod == Configuration::RenderMethod::OPENGL_SOFT) ? Configuration::RenderMethod::OPENGL_FULL : Configuration::RenderMethod::OPENGL_SOFT;
 							EngineMain::instance().switchToRenderMethod(newRenderMethod);
 							LogDisplay::instance().setLogDisplay((Configuration::instance().mRenderMethod == Configuration::RenderMethod::OPENGL_SOFT) ? "Switched to opengl-soft renderer" : "Switched to opengl-full renderer");
 						}
+#endif
 						break;
 					}
 				#endif
@@ -751,6 +762,10 @@ void Application::childClosed(GuiBase& child)
 
 void Application::setWindowMode(WindowMode windowMode, bool force)
 {
+#if defined(PLATFORM_UWP)
+	windowMode = WindowMode::FULLSCREEN_DESKTOP;
+#endif
+
 	if (mWindowMode == windowMode && !force)
 		return;
 
@@ -829,6 +844,11 @@ void Application::setWindowMode(WindowMode windowMode, bool force)
 
 void Application::toggleFullscreen()
 {
+#if defined(PLATFORM_UWP)
+	setWindowMode(WindowMode::FULLSCREEN_DESKTOP);
+	return;
+#endif
+
 	if (getWindowMode() == WindowMode::WINDOWED)
 	{
 	#if defined(PLATFORM_LINUX)

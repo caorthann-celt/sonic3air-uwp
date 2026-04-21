@@ -127,7 +127,11 @@ namespace opengldrawer
 		#if defined(RMX_USE_GLAD)
 			// GLAD initialization
 			RMX_LOG_INFO("GLAD initialization...");
-			gladLoadGL();
+			if (0 == gladLoadGL((GLADloadfunc)SDL_GL_GetProcAddress))
+			{
+				RMX_ERROR("Error in OpenGL initialization (gladLoadGL)", );
+				return;
+			}
 		#endif
 
 			// Register oxygen-specific callback for shader source code post-processing

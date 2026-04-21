@@ -674,6 +674,7 @@ void OptionsMenu::update(float timeElapsed)
 						case option::_CHECK_FOR_UPDATE:
 						case option::RELEASE_CHANNEL:
 						{
+#if !defined(PLATFORM_UWP)
 							UpdateCheck& updateCheck = GameClient::instance().getUpdateCheck();
 							if (updateCheck.hasUpdate())
 							{
@@ -683,6 +684,7 @@ void OptionsMenu::update(float timeElapsed)
 							{
 								updateCheck.startUpdateCheck();
 							}
+#endif
 							break;
 						}
 
@@ -710,19 +712,25 @@ void OptionsMenu::update(float timeElapsed)
 
 						case option::_OPEN_FILE_BROWSER:
 						{
+#if !defined(PLATFORM_UWP)
 							GameApp::instance().openFileBrowser();
+#endif
 							break;
 						}
 
 						case option::_OPEN_HOMEPAGE:
 						{
+#if !defined(PLATFORM_UWP)
 							PlatformFunctions::openURLExternal("https://sonic3air.org/");
+#endif
 							break;
 						}
 
 						case option::_OPEN_MANUAL:
 						{
+#if !defined(PLATFORM_UWP)
 							PlatformFunctions::openURLExternal("https://sonic3air.org/Manual.pdf");
+#endif
 							break;
 						}
 
@@ -998,6 +1006,10 @@ void OptionsMenu::setupOptionsMenu(bool enteredFromIngame)
 	// These options don't work on Android, so hide them
 	mOptionEntries[option::WINDOW_MODE].mGameMenuEntry->setVisible(false);
 	mOptionEntries[option::WINDOW_MODE_STARTUP].mGameMenuEntry->setVisible(false);
+#endif
+
+#if defined(PLATFORM_UWP)
+	mOptionEntries[option::CONTROLLER_AUTOASSIGN].mGameMenuEntry->setVisible(false);
 #endif
 
 	// Hide Mods and System tabs
@@ -1304,17 +1316,37 @@ void OptionsMenu::refreshGamepadLists(bool forceUpdate)
 			GameMenuEntry& entry = *mOptionEntries[option::CONTROLLER_PLAYER_1 + playerIndex].mGameMenuEntry;
 			const int32 preferredValue = InputManager::instance().getPreferredGamepadByJoystickInstanceId(playerIndex);
 			const uint32 oldSelectedValue = (preferredValue >= 0) ? (uint32)preferredValue : entry.hasSelected() ? entry.selected().mValue : (uint32)-1;
-			entry.mOptions.resize(1);	// First entry is the "None" entry
 
-			for (const InputManager::RealDevice& gamepad : InputManager::instance().getGamepads())
+#if defined(PLATFORM_UWP)
+			const bool allowNoneOption = (playerIndex != 0);
+#else
+			const bool allowNoneOption = true;
+#endif
+			entry.mOptions.resize(allowNoneOption ? 1 : 0);
+
+			const std::vector<InputManager::RealDevice>& gamepads = InputManager::instance().getGamepads();
+			for (size_t gamepadIndex = 0; gamepadIndex < gamepads.size(); ++gamepadIndex)
 			{
+				const InputManager::RealDevice& gamepad = gamepads[gamepadIndex];
+#if defined(PLATFORM_UWP)
+				// Keep player 1 on the first pad. Player 2 only gets the next one.
+				if (playerIndex > 0 && gamepadIndex == 0)
+					continue;
+#endif
 				std::string text = gamepad.getName();
 				utils::shortenTextToFit(text, global::mOxyfontRegular, 135);
 				entry.addOption(text, gamepad.mSDLJoystickInstanceId);
 			}
 			if (!entry.setSelectedIndexByValue(oldSelectedValue))
 			{
+#if defined(PLATFORM_UWP)
+				if (!entry.mOptions.empty())
+				{
+					entry.mSelectedIndex = allowNoneOption ? 0 : 0;
+				}
+#else
 				entry.mSelectedIndex = 0;
+#endif
 			}
 		}
 	}

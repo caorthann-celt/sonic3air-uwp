@@ -11,9 +11,12 @@
 #include "oxygen/helper/HighResolutionTimer.h"
 #include "oxygen/helper/Logging.h"
 
+#include <filesystem>
 #include <thread>
-
-#ifdef PLATFORM_WINDOWS
+#if defined(PLATFORM_UWP)
+	#include <SDL.h>
+	#include <SDL_system.h>
+#elif defined(PLATFORM_WINDOWS)
 	#include <CleanWindowsInclude.h>
 	#include <shlobj.h>		// For "SHGetKnownFolderPath"
 #elif defined(PLATFORM_LINUX) || defined(PLATFORM_MAC) || defined(PLATFORM_ANDROID) || defined(PLATFORM_SWITCH) || defined(PLATFORM_IOS) || defined(PLATFORM_VITA)
@@ -30,6 +33,48 @@
 
 namespace
 {
+#if defined(PLATFORM_UWP)
+	std::wstring getUwpLocalStorageRoot()
+	{
+		const char* path = SDL_WinRTGetFSPathUTF8(SDL_WINRT_PATH_LOCAL_FOLDER);
+		if (nullptr == path || path[0] == 0)
+			return L"";
+
+		// Keep saves loose in LocalState instead of creating an extra app folder.
+		const std::filesystem::path localRoot(rmx::convertFromUTF8(path));
+		if (localRoot.empty())
+			return L"";
+
+		std::error_code errorCode;
+		std::filesystem::create_directories(localRoot, errorCode);
+		return localRoot.wstring();
+	}
+
+	std::wstring getUwpExternalStorageRoot()
+	{
+		return L"E:/Sonic3AIR";
+	}
+
+	bool hasUwpExternalRomFile(const std::wstring& externalRoot)
+	{
+		if (externalRoot.empty())
+			return false;
+
+		std::error_code errorCode;
+		const std::filesystem::path romPath = std::filesystem::path(externalRoot) / L"Sonic_Knuckles_wSonic3.bin";
+		return std::filesystem::is_regular_file(romPath, errorCode);
+	}
+
+	std::wstring getUwpActiveStorageRoot()
+	{
+		const std::wstring externalRoot = getUwpExternalStorageRoot();
+		if (hasUwpExternalRomFile(externalRoot))
+			return externalRoot;
+
+		return getUwpLocalStorageRoot();
+	}
+#endif
+
 #ifdef PLATFORM_WINDOWS
 
 	std::wstring getStringRegKey(HKEY hKey, const wchar_t* valueName)
@@ -275,7 +320,9 @@ double PlatformFunctions::getTimerGranularityMilliseconds()
 
 void PlatformFunctions::changeWorkingDirectory(std::wstring_view executableCallPath)
 {
-#if defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_UWP)
+	(void)executableCallPath;
+#elif defined(PLATFORM_WINDOWS)
 	// Take the working directory from command line if possible
 	const size_t slashPos = executableCallPath.find_last_of(L"/\\");
 	if (slashPos != std::string::npos)
@@ -355,7 +402,14 @@ void PlatformFunctions::setAppIcon(int iconResource)
 
 std::wstring PlatformFunctions::getAppDataPath()
 {
-#ifdef PLATFORM_WINDOWS
+#if defined(PLATFORM_UWP)
+	std::wstring result = getUwpActiveStorageRoot();
+	if (!result.empty())
+	{
+		FTX::FileSystem->normalizePath(result, false);
+		return result;
+	}
+#elif defined(PLATFORM_WINDOWS)
 	PWSTR path = nullptr;
 	if (S_OK == SHGetKnownFolderPath(FOLDERID_RoamingAppData, KF_FLAG_DONT_UNEXPAND | KF_FLAG_CREATE, nullptr, &path))
 	{
@@ -378,7 +432,10 @@ std::wstring PlatformFunctions::getAppDataPath()
 
 std::wstring PlatformFunctions::tryGetSteamRomPath(const std::wstring& romName)
 {
-#ifdef PLATFORM_WINDOWS
+#if defined(PLATFORM_UWP)
+	(void)romName;
+	return L"";
+#elif defined(PLATFORM_WINDOWS)
 	const std::wstring steamPath = getSteamInstallationPath();
 	if (!steamPath.empty())
 	{
@@ -520,7 +577,12 @@ PlatformFunctions::DialogResult PlatformFunctions::showDialogBox(rmx::ErrorSever
 
 std::wstring PlatformFunctions::openFileSelectionDialog(const std::wstring& title, const std::wstring& defaultFilename, const wchar_t* filter)
 {
-#if defined(PLATFORM_WINDOWS)
+#if defined(PLATFORM_UWP)
+	(void)title;
+	(void)defaultFilename;
+	(void)filter;
+	return L"";
+#elif defined(PLATFORM_WINDOWS)
 
 	// This seems to be needed to prevent "GetOpenFileNameW" from randomly crashing
 	HRESULT hresult = CoInitializeEx(nullptr, COINIT_MULTITHREADED | COINIT_DISABLE_OLE1DDE);

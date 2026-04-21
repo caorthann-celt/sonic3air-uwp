@@ -80,6 +80,10 @@ GameLoader::UpdateResult GameLoader::updateLoading()
 					mState = State::WAITING_FOR_ROM;
 					return UpdateResult::CONTINUE;
 
+				#elif defined(PLATFORM_UWP)
+					RMX_ERROR("ROM could not be loaded!\nPlease add \"" << WString(gameProfile.mRomInfos[0].mSteamRomName).toStdString() << "\" to LocalState or E:/Sonic3AIR.\n\nThe application will now close.", );
+					return UpdateResult::FAILURE;
+
 				#else
 					RMX_ERROR("ROM could not be loaded!\nAn original " + gameProfile.mRomInfos[0].mSteamGameName + " ROM must be added manually. See the Manual for details.\n\nThe application will now close.", );
 					return UpdateResult::FAILURE;
@@ -88,7 +92,11 @@ GameLoader::UpdateResult GameLoader::updateLoading()
 				}
 				else
 				{
+				#if defined(PLATFORM_UWP)
+					RMX_ERROR("ROM could not be loaded!\nPlease add your ROM to LocalState or E:/Sonic3AIR.\n\nThe application will now close.", );
+				#else
 					RMX_ERROR("ROM could not be loaded!\nAn original game ROM must be added manually. See the Manual for details.\n\nThe application will now close.", );
+				#endif
 				}
 			}
 			RMX_LOG_INFO("ROM found at: " << WString(Configuration::instance().mLastRomPath).toStdString());
