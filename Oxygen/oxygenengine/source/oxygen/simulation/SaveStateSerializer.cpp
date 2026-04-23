@@ -25,8 +25,7 @@ namespace
 	//  - 4: Added more rendering data (scroll offsets, sprites, etc.)
 	//  - 5: Added data for ROM based sprites
 	//  - 6: Added spaces manager serialization
-	//  - 7: Added "mRenderPlaneABehindW" flag for plane manager
-	static const constexpr uint8 OXYGEN_SAVESTATE_FORMATVERSION = 7;
+	static const constexpr uint8 OXYGEN_SAVESTATE_FORMATVERSION = 6;
 }
 
 

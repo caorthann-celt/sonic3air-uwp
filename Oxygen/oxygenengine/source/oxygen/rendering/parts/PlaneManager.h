@@ -32,12 +32,6 @@ public:
 		uint16 mRenderQueue = 0;
 	};
 
-	struct PlaneRect
-	{
-		PlaneType mPlane = PLANE_B;
-		Recti mRect;
-	};
-
 public:
 	PlaneManager(PatternManager& patternManager);
 
@@ -74,8 +68,7 @@ public:
 	inline uint16 getPlaneAWSplitY() const	 { return mPlaneAWSplitY; }
 	void setWindowPlaneSplitX(bool rightSideWindow, uint16 splitX);
 	void setWindowPlaneSplitY(bool bottomWindow, uint16 splitY);
-	void setRenderPlaneABehindW(bool renderPlaneABehindW);
-	void getPlaneRects(std::vector<PlaneRect>& output, const Recti& fullscreenRect) const;
+	Recti getPlaneRect(int planeIndex, const Recti& fullscreenRect) const;
 
 	void dumpAsPaletteBitmap(PaletteBitmap& output, int planeIndex, bool highlightPrioPatterns = false) const;
 
@@ -104,7 +97,6 @@ private:
 	bool mIsPlaneWBelowSplitY = false;		// If true, plane W is below plane A, otherwise it's above plane A
 	uint16 mPlaneAWSplitX = 0;
 	uint16 mPlaneAWSplitY = 0;
-	bool mRenderPlaneABehindW = false;		// If true, render plane A fullscreen, even where the screen intersects with plane W
 
 	bool mDisabledDefaultPlane[4];
 	std::vector<CustomPlane> mCustomPlanes;
